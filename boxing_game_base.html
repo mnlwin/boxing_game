@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boxing Board Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        #game-container {
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid black;
+            background-color: white;
+            margin-top: 20px;
+        }
+        #controls, #status {
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        select {
+            padding: 5px;
+            font-size: 16px;
+            margin: 5px;
+        }
+        #status {
+            font-size: 18px;
+            font-weight: bold;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>Boxing Board Game</h1>
+        <div id="setup">
+            <h2>Player 1: Select Items</h2>
+            <select id="p1-item1"></select>
+            <select id="p1-item2"></select>
+            <button id="confirm-p1" onclick="confirmPlayer1Items()">Confirm Player 1 Items</button>
+            <h2>Player 2: Select Items</h2>
+            <select id="p2-item1"></select>
+            <select id="p2-item2"></select>
+            <button id="confirm-p2" onclick="confirmPlayer2Items()">Confirm Player 2 Items</button>
+        </div>
+        <div id="controls" style="display: none;">
+            <button id="roll-dice" onclick="rollDice()">Roll Dice</button>
+            <button onclick="restartGame()">Restart Game</button>
+        </div>
+        <div id="status"></div>
+        <canvas id="game-canvas" width="600" height="400"></canvas>
+    </div>
+
+    <script>
+        // Game state
+        const items = [
+            { name: "Boxing Gloves", attack: 2, hp: 0 },
+            { name: "Energy Drink", attack: 1, hp: 10 },
+            { name: "Training Pads", attack: 0, hp: 15 },
+            { name: "Speed Bag", attack: 3, hp: -5 }
+        ];
+
+        let gameState = {
+            phase: "setup",
+            currentPlayer: 1,
+            player1: { hp: 50, attack: 5, items: [] },
+            player2: { hp: 50, attack: 5, items: [] },
+            player1Confirmed: false,
+            player2Confirmed: false,
+            lastRoll: null,
+            winner: null
+        };
+
+        // Canvas setup
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+
+        // Populate item selectors
+        const selectors = ["p1-item1", "p1-item2", "p2-item1", "p2-item2"];
+        selectors.forEach(id => {
+            const select = document.getElementById(id);
+            items.forEach(item => {
+                const option = document.createElement("option");
+                option.value = item.name;
+                option.textContent = `${item.name} (Attack: +${item.attack}, HP: +${item.hp})`;
+                select.appendChild(option);
+            });
+        });
+
+        // Confirm item selections
+        function confirmPlayer1Items() {
+            const item1 = document.getElementById("p1-item1").value;
+            const item2 = document.getElementById("p1-item2").value;
+            if (item1 === item2) {
+                alert("Please select two different items.");
+                return;
+            }
+            try {
+                applyItems(1, item1, item2);
+                gameState.player1Confirmed = true;
+                document.getElementById("p1-item1").disabled = true;
+                document.getElementById("p1-item2").disabled = true;
+                document.getElementById("confirm-p1").disabled = true;
+                console.log("Player 1 confirmed:", gameState.player1);
+                checkSetupComplete();
+            } catch (error) {
+                console.error("Error confirming Player 1 items:", error);
+                alert("An error occurred. Please try again.");
+            }
+        }
+
+        function confirmPlayer2Items() {
+            const item1 = document.getElementById("p2-item1").value;
+            const item2 = document.getElementById("p2-item2").value;
+            if (item1 === item2) {
+                alert("Please select two different items.");
+                return;
+            }
+            try {
+                applyItems(2, item1, item2);
+                gameState.player2Confirmed = true;
+                document.getElementById("p2-item1").disabled = true;
+                document.getElementById("p2-item2").disabled = true;
+                document.getElementById("confirm-p2").disabled = true;
+                console.log("Player 2 confirmed:", gameState.player2);
+                checkSetupComplete();
+            } catch (error) {
+                console.error("Error confirming Player 2 items:", error);
+                alert("An error occurred. Please try again.");
+            }
+        }
+
+        function applyItems(playerNum, item1Name, item2Name) {
+            const player = playerNum === 1 ? gameState.player1 : gameState.player2;
+            const item1 = items.find(i => i.name === item1Name);
+            const item2 = items.find(i => i.name === item2Name);
+            if (!item1 || !item2) {
+                throw new Error("Invalid item selected");
+            }
+            player.items = [item1, item2];
+            player.attack += item1.attack + item2.attack;
+            player.hp += item1.hp + item2.hp;
+            if (player.hp < 1) player.hp = 1; // Ensure HP doesn't go below 1
+        }
+
+        function checkSetupComplete() {
+            console.log("Checking setup complete:", { p1: gameState.player1Confirmed, p2: gameState.player2Confirmed });
+            if (gameState.player1Confirmed && gameState.player2Confirmed) {
+                gameState.phase = "battle";
+                const setupDiv = document.getElementById("setup");
+                const controlsDiv = document.getElementById("controls");
+                if (setupDiv && controlsDiv) {
+                    setupDiv.style.display = "none";
+                    controlsDiv.style.display = "block";
+                    updateStatus(`Player ${gameState.currentPlayer}'s turn to roll the dice!`);
+                    drawScene();
+                    console.log("Transitioned to battle phase");
+                } else {
+                    console.error("DOM elements not found:", { setupDiv, controlsDiv });
+                }
+            }
+        }
+
+        function rollDice() {
+            const roll = Math.floor(Math.random() * 6) + 1;
+            gameState.lastRoll = roll;
+            const attacker = gameState.currentPlayer === 1 ? gameState.player1 : gameState.player2;
+            const defender = gameState.currentPlayer === 1 ? gameState.player2 : gameState.player1;
+            const damage = Math.max(0, roll + attacker.attack - 2); // Base damage modified by attack
+            defender.hp = Math.max(0, defender.hp - damage);
+            updateStatus(`Player ${gameState.currentPlayer} rolled a ${roll}! Dealt ${damage} damage to Player ${gameState.currentPlayer === 1 ? 2 : 1}.`);
+
+            // Check for win
+            if (defender.hp <= 0) {
+                gameState.winner = gameState.currentPlayer;
+                gameState.phase = "gameover";
+                updateStatus(`Player ${gameState.winner} wins!`);
+                document.getElementById("roll-dice").disabled = true;
+            } else {
+                // Switch turns
+                gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+                updateStatus(`Player ${gameState.currentPlayer}'s turn to roll the dice!`);
+            }
+            drawScene();
+        }
+
+        function restartGame() {
+            gameState = {
+                phase: "setup",
+                currentPlayer: 1,
+                player1: { hp: 50, attack: 5, items: [] },
+                player2: { hp: 50, attack: 5, items: [] },
+                player1Confirmed: false,
+                player2Confirmed: false,
+                lastRoll: null,
+                winner: null
+            };
+            document.getElementById("setup").style.display = "block";
+            document.getElementById("controls").style.display = "none";
+            document.getElementById("roll-dice").disabled = false;
+            selectors.forEach(id => {
+                document.getElementById(id).disabled = false;
+            });
+            document.getElementById("confirm-p1").disabled = false;
+            document.getElementById("confirm-p2").disabled = false;
+            updateStatus("Player 1: Select your items.");
+            drawScene();
+        }
+
+        function updateStatus(message) {
+            const statusDiv = document.getElementById("status");
+            if (statusDiv) {
+                statusDiv.textContent = message;
+            } else {
+                console.error("Status div not found");
+            }
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ring
+            ctx.fillStyle = "#8B4513";
+            ctx.fillRect(100, 100, 400, 200);
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 5;
+            ctx.strokeRect(100, 100, 400, 200);
+
+            // Draw players (simple rectangles)
+            ctx.fillStyle = gameState.currentPlayer === 1 ? "red" : "#ff6666";
+            ctx.fillRect(150, 150, 50, 100); // Player 1
+            ctx.fillStyle = gameState.currentPlayer === 2 ? "blue" : "#6666ff";
+            ctx.fillRect(400, 150, 50, 100); // Player 2
+
+            // Draw HP bars
+            ctx.fillStyle = "black";
+            ctx.font = "16px Arial";
+            ctx.fillText(`Player 1 HP: ${gameState.player1.hp}`, 10, 30);
+            ctx.fillStyle = "red";
+            ctx.fillRect(10, 40, gameState.player1.hp * 2, 20);
+            ctx.fillStyle = "black";
+            ctx.fillText(`Player 2 HP: ${gameState.player2.hp}`, 10, 80);
+            ctx.fillStyle = "blue";
+            ctx.fillRect(10, 90, gameState.player2.hp * 2, 20);
+
+            // Draw items
+            ctx.font = "14px Arial";
+            ctx.fillStyle = "black";
+            ctx.fillText("Player 1 Items: " + (gameState.player1.items.length ? gameState.player1.items.map(i => i.name).join(", ") : "None"), 10, 340);
+            ctx.fillText("Player 2 Items: " + (gameState.player2.items.length ? gameState.player2.items.map(i => i.name).join(", ") : "None"), 10, 360);
+
+            // Draw last roll
+            if (gameState.lastRoll) {
+                ctx.font = "20px Arial";
+                ctx.fillText(`Last Roll: ${gameState.lastRoll}`, 250, 50);
+            }
+
+            // Draw game over
+            if (gameState.phase === "gameover") {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                ctx.fillRect(0o0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white";
+                ctx.font = "30px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText(`Player ${gameState.winner} Wins!`, canvas.width / 2, canvas.height / 2);
+                ctx.textAlign = "left";
+            }
+        }
+
+        // Initial draw
+        drawScene();
+    </script>
+</body>
+</html>
