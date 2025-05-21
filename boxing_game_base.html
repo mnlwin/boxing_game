@@ -51,6 +51,11 @@
             font-size: 18px;
             font-weight: bold;
             min-height: 50px;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: rgba(67, 235, 106, 0.8);
+            border-radius: 5px;
+            text-align: center;
         }
     </style>
 </head>
@@ -191,6 +196,48 @@
             }
         }
 
+        let messageQueue = [];
+        let isDisplayingMessage = false;
+
+        function updateStatus(message) {
+            const statusDiv = document.getElementById("status");
+            if (!statusDiv) {
+                console.error("Status div not found");
+                return;
+            }
+
+            messageQueue.push(message);
+            
+            if (!isDisplayingMessage) {
+                displayNextMessage();
+            }
+        }
+
+        function displayNextMessage() {
+            if (messageQueue.length === 0) {
+                isDisplayingMessage = false;
+                return;
+            }
+
+            isDisplayingMessage = true;
+            const statusDiv = document.getElementById("status");
+            const message = messageQueue.shift();
+            
+            // Create a new paragraph element for the message
+            const messageElement = document.createElement("p");
+            messageElement.textContent = message;
+            messageElement.style.margin = "5px 0";
+            
+            // Clear previous messages and add the new one
+            statusDiv.innerHTML = "";
+            statusDiv.appendChild(messageElement);
+
+            // Wait before showing next message
+            setTimeout(() => {
+                displayNextMessage();
+            }, 3000); // 2 second delay between messages
+        }
+
         function rollDice() {
             const roll = Math.floor(Math.random() * 6) + 1;
             gameState.lastRoll = roll;
@@ -254,6 +301,11 @@
         }
 
         function restartGame() {
+            // Clear message queue
+            messageQueue = [];
+            isDisplayingMessage = false;
+            
+            // Reset game state
             gameState = {
                 phase: "setup",
                 currentPlayer: 1,
@@ -264,6 +316,8 @@
                 lastRoll: null,
                 winner: null
             };
+            
+            // Reset UI elements
             document.getElementById("setup").style.display = "block";
             document.getElementById("controls").style.display = "none";
             document.getElementById("roll-dice").disabled = false;
@@ -272,17 +326,13 @@
             });
             document.getElementById("confirm-p1").disabled = false;
             document.getElementById("confirm-p2").disabled = false;
-            updateStatus("Player 1: Select your items.");
-            drawScene();
-        }
-
-        function updateStatus(message) {
+            
+            // Clear and update status
             const statusDiv = document.getElementById("status");
-            if (statusDiv) {
-                statusDiv.textContent = message;
-            } else {
-                console.error("Status div not found");
-            }
+            statusDiv.innerHTML = "";
+            updateStatus("Player 1: Select your items.");
+            
+            drawScene();
         }
 
         function drawScene() {
