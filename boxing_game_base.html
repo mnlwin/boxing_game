@@ -81,29 +81,30 @@
     </div>
 
     <script>
-        // Game state
+        // Update the items array to include costs
         const items = [
-            { name: "Boxing shorts", attack: 1, hp: 5 },
-            { name: "super gloves ", attack: 10, hp: 1 },
-            { name: "mouth gaurd", attack: 1, hp: 20  },
-            { name: "cool mouth gaurd", attack: 2, hp: 20 },
-            { name: "boxing gloves", attack: 2, hp: 20 },
-            { name: "mittens", attack: 3, hp: 0 },
-            { name: "super muscles", attack: 100, hp: 170 },
-            { name: "muscles", attack: 75, hp: 100 },
-            { name: "minor muscles", attack: 45, hp: 20 }
-
+            { name: "Boxing shorts", attack: 1, hp: 5, cost: 2 },
+            { name: "super gloves", attack: 10, hp: 1, cost: 8 },
+            { name: "mouth guard", attack: 1, hp: 20, cost: 5 },
+            { name: "cool mouth guard", attack: 2, hp: 20, cost: 7 },
+            { name: "boxing gloves", attack: 2, hp: 20, cost: 6 },
+            { name: "mittens", attack: 3, hp: 0, cost: 3 },
+            { name: "super muscles", attack: 100, hp: 170, cost: 50 },
+            { name: "muscles", attack: 75, hp: 100, cost: 30 },
+            { name: "minor muscles", attack: 45, hp: 20, cost: 15 }
         ];
 
+        // Update gameState to include money
         let gameState = {
             phase: "setup",
             currentPlayer: 1,
-            player1: { hp: 100, attack: 5, items: [] },
-            player2: { hp: 100, attack: 5, items: [] },
+            player1: { hp: 100, attack: 5, items: [], money: 10 },
+            player2: { hp: 100, attack: 5, items: [], money: 10 },
             player1Confirmed: false,
             player2Confirmed: false,
             lastRoll: null,
-            winner: null
+            winner: null,
+            gamesWon: { player1: 0, player2: 0 }
         };
 
         // Canvas setup
@@ -114,10 +115,20 @@
         const selectors = ["p1-item1", "p1-item2", "p2-item1", "p2-item2"];
         selectors.forEach(id => {
             const select = document.getElementById(id);
+            const playerNum = id.startsWith('p1') ? 1 : 2;
+            const player = playerNum === 1 ? gameState.player1 : gameState.player2;
+            
+            // Add "No item" option first
+            const noItemOption = document.createElement("option");
+            noItemOption.value = "none";
+            noItemOption.textContent = "No item (Free)";
+            select.appendChild(noItemOption);
+            
             items.forEach(item => {
                 const option = document.createElement("option");
                 option.value = item.name;
-                option.textContent = `${item.name} (Attack: +${item.attack}, HP: +${item.hp})`;
+                option.textContent = `${item.name} (Attack: +${item.attack}, HP: +${item.hp}, Cost: $${item.cost})`;
+                option.disabled = item.cost > player.money;
                 select.appendChild(option);
             });
         });
@@ -167,15 +178,37 @@
 
         function applyItems(playerNum, item1Name, item2Name) {
             const player = playerNum === 1 ? gameState.player1 : gameState.player2;
-            const item1 = items.find(i => i.name === item1Name);
-            const item2 = items.find(i => i.name === item2Name);
+            
+            // Create dummy item for "none" selections
+            const noItem = { name: "none", attack: 0, hp: 0, cost: 0 };
+            
+            // Get items or use noItem if "none" is selected
+            const item1 = item1Name === "none" ? noItem : items.find(i => i.name === item1Name);
+            const item2 = item2Name === "none" ? noItem : items.find(i => i.name === item2Name);
+            
             if (!item1 || !item2) {
                 throw new Error("Invalid item selected");
             }
-            player.items = [item1, item2];
+            
+            // Check if player can afford items
+            const totalCost = item1.cost + item2.cost;
+            if (totalCost > player.money) {
+                throw new Error("Not enough money for selected items");
+            }
+            
+            // Deduct money and apply items (excluding "none" items)
+            player.money -= totalCost;
+            player.items = [item1, item2].filter(item => item.name !== "none");
             player.attack += item1.attack + item2.attack;
             player.hp += item1.hp + item2.hp;
-            if (player.hp < 1) player.hp = 1; // Ensure HP doesn't go below 1
+            if (player.hp < 1) player.hp = 1;
+            
+            // Update money display with appropriate message
+            if (totalCost === 0) {
+                updateStatus(`Player ${playerNum} chose no items. Money remaining: $${player.money}`);
+            } else {
+                updateStatus(`Player ${playerNum} spent $${totalCost}. Remaining money: $${player.money}`);
+            }
         }
 
         function checkSetupComplete() {
@@ -290,7 +323,13 @@
             if (defender.hp <= 0) {
                 gameState.winner = gameState.currentPlayer;
                 gameState.phase = "gameover";
-                updateStatus(`Player ${gameState.winner} wins!`);
+                
+                // Award money to winner
+                const winner = gameState.currentPlayer === 1 ? gameState.player1 : gameState.player2;
+                winner.money += 15; // Award $15 for winning
+                gameState.gamesWon[`player${gameState.currentPlayer}`]++;
+                
+                updateStatus(`Player ${gameState.winner} wins and earns $15! Total money: $${winner.money}`);
                 document.getElementById("roll-dice").disabled = true;
             } else {
                 // Switch turns
@@ -301,36 +340,63 @@
         }
 
         function restartGame() {
+            // Preserve current money and wins
+            const p1Money = gameState.player1.money;
+            const p2Money = gameState.player2.money;
+            const gamesWon = gameState.gamesWon;
+            
             // Clear message queue
             messageQueue = [];
             isDisplayingMessage = false;
             
-            // Reset game state
+            // Reset game state but keep money and wins
             gameState = {
                 phase: "setup",
                 currentPlayer: 1,
-                player1: { hp: 100, attack: 5, items: [] },
-                player2: { hp: 100, attack: 5, items: [] },
+                player1: { hp: 100, attack: 5, items: [], money: p1Money },
+                player2: { hp: 100, attack: 5, items: [], money: p2Money },
                 player1Confirmed: false,
                 player2Confirmed: false,
                 lastRoll: null,
-                winner: null
+                winner: null,
+                gamesWon: gamesWon
             };
             
             // Reset UI elements
             document.getElementById("setup").style.display = "block";
             document.getElementById("controls").style.display = "none";
             document.getElementById("roll-dice").disabled = false;
+            
+            // Clear and repopulate selectors with updated money restrictions
             selectors.forEach(id => {
-                document.getElementById(id).disabled = false;
+                const select = document.getElementById(id);
+                select.innerHTML = ""; // Clear existing options
+                const playerNum = id.startsWith('p1') ? 1 : 2;
+                const player = playerNum === 1 ? gameState.player1 : gameState.player2;
+                
+                // Add "No item" option first
+                const noItemOption = document.createElement("option");
+                noItemOption.value = "none";
+                noItemOption.textContent = "No item (Free)";
+                select.appendChild(noItemOption);
+                
+                items.forEach(item => {
+                    const option = document.createElement("option");
+                    option.value = item.name;
+                    option.textContent = `${item.name} (Attack: +${item.attack}, HP: +${item.hp}, Cost: $${item.cost})`;
+                    option.disabled = item.cost > player.money;
+                    select.appendChild(option);
+                });
+                select.disabled = false;
             });
+            
             document.getElementById("confirm-p1").disabled = false;
             document.getElementById("confirm-p2").disabled = false;
             
             // Clear and update status
             const statusDiv = document.getElementById("status");
             statusDiv.innerHTML = "";
-            updateStatus("Player 1: Select your items.");
+            updateStatus(`New game! Player 1: $${p1Money} | Player 2: $${p2Money}`);
             
             drawScene();
         }
