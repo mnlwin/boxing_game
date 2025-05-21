@@ -127,6 +127,7 @@
         const selectors = ["p1-item1", "p1-item2", "p2-item1", "p2-item2"];
         selectors.forEach(id => {
             const select = document.getElementById(id);
+            select.innerHTML = ""; // Clear existing options
             const playerNum = id.startsWith('p1') ? 1 : 2;
             const player = playerNum === 1 ? gameState.player1 : gameState.player2;
             
@@ -134,8 +135,10 @@
             const noItemOption = document.createElement("option");
             noItemOption.value = "none";
             noItemOption.textContent = "No item (Free)";
+            noItemOption.selected = true; // Make "No item" the default selection
             select.appendChild(noItemOption);
             
+            // Add all other items
             items.forEach(item => {
                 const option = document.createElement("option");
                 option.value = item.name;
@@ -149,7 +152,7 @@
         function confirmPlayer1Items() {
             const item1 = document.getElementById("p1-item1").value;
             const item2 = document.getElementById("p1-item2").value;
-            if (item1 === item2) {
+            if (item1 === item2 && item1 !== "none") {
                 alert("Please select two different items.");
                 return;
             }
@@ -170,7 +173,7 @@
         function confirmPlayer2Items() {
             const item1 = document.getElementById("p2-item1").value;
             const item2 = document.getElementById("p2-item2").value;
-            if (item1 === item2) {
+            if (item1 === item2 && item1 !== "none") {
                 alert("Please select two different items.");
                 return;
             }
@@ -280,7 +283,7 @@
             // Wait before showing next message
             setTimeout(() => {
                 displayNextMessage();
-            }, 3000); // 2 second delay between messages
+            }, 3000); // Changed comment to match 3 second delay
         }
 
         function rollDice() {
@@ -371,16 +374,12 @@
         }
 
         function restartGame() {
-            // Preserve current money, wins, and fans
+            // Preserve current money, wins, fans, and items
             const p1Money = gameState.player1.money;
             const p2Money = gameState.player2.money;
             const p1Fans = gameState.player1.fans;
             const p2Fans = gameState.player2.fans;
             const gamesWon = gameState.gamesWon;
-            
-            // Clear message queue
-            messageQueue = [];
-            isDisplayingMessage = false;
             
             // Reset game state but keep money, fans, and wins
             gameState = {
@@ -407,24 +406,29 @@
                 gamesWon: gamesWon
             };
             
-            // Reset UI elements
+            // Reset UI elements and show setup menu
             document.getElementById("setup").style.display = "block";
             document.getElementById("controls").style.display = "none";
             document.getElementById("roll-dice").disabled = false;
             
-            // Clear and repopulate selectors with updated money restrictions
-            selectors.forEach(id => {
+            // Re-enable all selectors and buttons
+            ["p1-item1", "p1-item2", "p2-item1", "p2-item2"].forEach(id => {
                 const select = document.getElementById(id);
+                select.disabled = false;
                 select.innerHTML = ""; // Clear existing options
+                
+                // Determine which player this selector is for
                 const playerNum = id.startsWith('p1') ? 1 : 2;
                 const player = playerNum === 1 ? gameState.player1 : gameState.player2;
                 
-                // Add "No item" option first
+                // Add "No item" option
                 const noItemOption = document.createElement("option");
                 noItemOption.value = "none";
                 noItemOption.textContent = "No item (Free)";
+                noItemOption.selected = true;
                 select.appendChild(noItemOption);
                 
+                // Add all other items with updated availability based on money
                 items.forEach(item => {
                     const option = document.createElement("option");
                     option.value = item.name;
@@ -432,16 +436,17 @@
                     option.disabled = item.cost > player.money;
                     select.appendChild(option);
                 });
-                select.disabled = false;
             });
             
+            // Re-enable confirm buttons
             document.getElementById("confirm-p1").disabled = false;
             document.getElementById("confirm-p2").disabled = false;
             
             // Clear and update status
             const statusDiv = document.getElementById("status");
             statusDiv.innerHTML = "";
-            updateStatus(`New game! Player 1: $${p1Money} (${p1Fans} fans) | Player 2: $${p2Money} (${p2Fans} fans)`);
+            updateStatus(`Select your items! Player 1: $${p1Money} (${p1Fans} fans)`);
+            updateStatus(`Player 2: $${p2Money} (${p2Fans} fans)`);
             
             drawScene();
         }
@@ -490,7 +495,7 @@
             // Draw game over
             if (gameState.phase === "gameover") {
                 ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                ctx.fillRect(0o0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "white";
                 ctx.font = "30px Arial";
                 ctx.textAlign = "center";
