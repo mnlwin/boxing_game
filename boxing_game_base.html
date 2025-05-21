@@ -98,8 +98,20 @@
         let gameState = {
             phase: "setup",
             currentPlayer: 1,
-            player1: { hp: 100, attack: 5, items: [], money: 10 },
-            player2: { hp: 100, attack: 5, items: [], money: 10 },
+            player1: { 
+                hp: 100, 
+                attack: 5, 
+                items: [], 
+                money: 10,
+                fans: 0  // Add fans count
+            },
+            player2: { 
+                hp: 100, 
+                attack: 5, 
+                items: [], 
+                money: 10,
+                fans: 0  // Add fans count
+            },
             player1Confirmed: false,
             player2Confirmed: false,
             lastRoll: null,
@@ -324,12 +336,31 @@
                 gameState.winner = gameState.currentPlayer;
                 gameState.phase = "gameover";
                 
-                // Award money to winner
+                // Get winner reference
                 const winner = gameState.currentPlayer === 1 ? gameState.player1 : gameState.player2;
-                winner.money += 15; // Award $15 for winning
-                gameState.gamesWon[`player${gameState.currentPlayer}`]++;
                 
-                updateStatus(`Player ${gameState.winner} wins and earns $15! Total money: $${winner.money}`);
+                // Update wins and fans
+                gameState.gamesWon[`player${gameState.currentPlayer}`]++;
+                const wins = gameState.gamesWon[`player${gameState.currentPlayer}`];
+                
+                // Add fans based on wins (more wins = more new fans)
+                const newFans = Math.floor(Math.random() * wins) + 1;
+                winner.fans += newFans;
+                
+                // Calculate money earned (base + fan bonus)
+                const baseMoney = 15;
+                const fanBonus = Math.floor(winner.fans * 0.5); // Each fan adds $0.50 to winnings
+                const totalMoney = baseMoney + fanBonus;
+                winner.money += totalMoney;
+                
+                updateStatus(`Player ${gameState.winner} wins! Gained ${newFans} new fans!`);
+                setTimeout(() => {
+                    updateStatus(`Earned $${totalMoney} ($${baseMoney} base + $${fanBonus} fan bonus)`);
+                }, 2000);
+                setTimeout(() => {
+                    updateStatus(`Total fans: ${winner.fans} | Total money: $${winner.money}`);
+                }, 4000);
+                
                 document.getElementById("roll-dice").disabled = true;
             } else {
                 // Switch turns
@@ -340,21 +371,35 @@
         }
 
         function restartGame() {
-            // Preserve current money and wins
+            // Preserve current money, wins, and fans
             const p1Money = gameState.player1.money;
             const p2Money = gameState.player2.money;
+            const p1Fans = gameState.player1.fans;
+            const p2Fans = gameState.player2.fans;
             const gamesWon = gameState.gamesWon;
             
             // Clear message queue
             messageQueue = [];
             isDisplayingMessage = false;
             
-            // Reset game state but keep money and wins
+            // Reset game state but keep money, fans, and wins
             gameState = {
                 phase: "setup",
                 currentPlayer: 1,
-                player1: { hp: 100, attack: 5, items: [], money: p1Money },
-                player2: { hp: 100, attack: 5, items: [], money: p2Money },
+                player1: { 
+                    hp: 100, 
+                    attack: 5, 
+                    items: [], 
+                    money: p1Money,
+                    fans: p1Fans 
+                },
+                player2: { 
+                    hp: 100, 
+                    attack: 5, 
+                    items: [], 
+                    money: p2Money,
+                    fans: p2Fans
+                },
                 player1Confirmed: false,
                 player2Confirmed: false,
                 lastRoll: null,
@@ -396,7 +441,7 @@
             // Clear and update status
             const statusDiv = document.getElementById("status");
             statusDiv.innerHTML = "";
-            updateStatus(`New game! Player 1: $${p1Money} | Player 2: $${p2Money}`);
+            updateStatus(`New game! Player 1: $${p1Money} (${p1Fans} fans) | Player 2: $${p2Money} (${p2Fans} fans)`);
             
             drawScene();
         }
@@ -433,6 +478,8 @@
             ctx.fillStyle = "black";
             ctx.fillText("Player 1 Items: " + (gameState.player1.items.length ? gameState.player1.items.map(i => i.name).join(", ") : "None"), 10, 340);
             ctx.fillText("Player 2 Items: " + (gameState.player2.items.length ? gameState.player2.items.map(i => i.name).join(", ") : "None"), 10, 360);
+            ctx.fillText(`Player 1 Fans: ${gameState.player1.fans}`, 10, 380);
+            ctx.fillText(`Player 2 Fans: ${gameState.player2.fans}`, 10, 400);
 
             // Draw last roll
             if (gameState.lastRoll) {
