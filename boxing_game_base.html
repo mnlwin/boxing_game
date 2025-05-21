@@ -93,8 +93,8 @@
         let gameState = {
             phase: "setup",
             currentPlayer: 1,
-            player1: { hp: 50, attack: 5, items: [] },
-            player2: { hp: 50, attack: 5, items: [] },
+            player1: { hp: 100, attack: 5, items: [] },
+            player2: { hp: 100, attack: 5, items: [] },
             player1Confirmed: false,
             player2Confirmed: false,
             lastRoll: null,
@@ -196,9 +196,48 @@
             gameState.lastRoll = roll;
             const attacker = gameState.currentPlayer === 1 ? gameState.player1 : gameState.player2;
             const defender = gameState.currentPlayer === 1 ? gameState.player2 : gameState.player1;
-            const damage = Math.max(0, roll + attacker.attack - 2); // Base damage modified by attack
-            defender.hp = Math.max(0, defender.hp - damage);
-            updateStatus(`Player ${gameState.currentPlayer} rolled a ${roll}! Dealt ${damage} damage to Player ${gameState.currentPlayer === 1 ? 2 : 1}.`);
+            
+            // Define damage based on roll value
+            let damage = 0;
+            let moveType = '';
+            
+            switch(roll) {
+                case 1:
+                    damage = 5;
+                    moveType = 'punch';
+                    break;
+                case 2:
+                    damage = -1; // miss punch that hurts yourself
+                    moveType = 'miss punch';
+                    break;
+                case 3:
+                    damage = 15;
+                    moveType = 'face punch';
+                    break;
+                case 4:
+                    damage = 12;
+                    moveType = 'kick';
+                    break;
+                case 5:
+                    damage = 20;
+                    moveType = 'big punch';
+                    break;
+                case 6:
+                    damage = 17;
+                    moveType = 'upper cut';
+                    break;
+            }
+
+            // Apply damage based on who gets hit
+            if (roll === 2) {
+                // Miss punch damages the attacker
+                attacker.hp = Math.max(0, attacker.hp - 1);
+                updateStatus(`Player ${gameState.currentPlayer} rolled a ${roll} - ${moveType}! Hurt themselves for 1 damage!`);
+            } else {
+                // Normal attack damages the defender
+                defender.hp = Math.max(0, defender.hp - damage);
+                updateStatus(`Player ${gameState.currentPlayer} rolled a ${roll} - ${moveType}! Dealt ${damage} damage to Player ${gameState.currentPlayer === 1 ? 2 : 1}.`);
+            }
 
             // Check for win
             if (defender.hp <= 0) {
@@ -218,8 +257,8 @@
             gameState = {
                 phase: "setup",
                 currentPlayer: 1,
-                player1: { hp: 50, attack: 5, items: [] },
-                player2: { hp: 50, attack: 5, items: [] },
+                player1: { hp: 100, attack: 5, items: [] },
+                player2: { hp: 100, attack: 5, items: [] },
                 player1Confirmed: false,
                 player2Confirmed: false,
                 lastRoll: null,
