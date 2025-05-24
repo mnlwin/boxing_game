@@ -74,7 +74,7 @@
         </div>
         <div id="controls" style="display: none;">
             <button id="roll-dice" onclick="rollDice()">Roll Dice</button>
-            <button onclick="restartGame()">Restart Game</button>
+            <button onclick="restartGame()">Next Fight</button>
         </div>
         <div id="status"></div>
         <canvas id="game-canvas" width="600" height="400"></canvas>
@@ -346,22 +346,28 @@
                 gameState.gamesWon[`player${gameState.currentPlayer}`]++;
                 const wins = gameState.gamesWon[`player${gameState.currentPlayer}`];
                 
-                // Add fans based on wins (more wins = more new fans)
-                const newFans = Math.floor(Math.random() * wins) + 1;
-                winner.fans += newFans;
+                // Calculate fans based on wins (2 wins = 1 fan)
+                const totalFansEarned = Math.floor(wins / 2);
+                const newFans = totalFansEarned - winner.fans;
+                
+                if (newFans > 0) {
+                    winner.fans += newFans;
+                    updateStatus(`Player ${gameState.winner} wins! Gained ${newFans} new fan${newFans > 1 ? 's' : ''}!`);
+                } else {
+                    updateStatus(`Player ${gameState.winner} wins! No new fans this time.`);
+                }
                 
                 // Calculate money earned (base + fan bonus)
                 const baseMoney = 15;
-                const fanBonus = Math.floor(winner.fans * 0.5); // Each fan adds $0.50 to winnings
+                const fanBonus = Math.floor(winner.fans * 0.5);
                 const totalMoney = baseMoney + fanBonus;
                 winner.money += totalMoney;
                 
-                updateStatus(`Player ${gameState.winner} wins! Gained ${newFans} new fans!`);
                 setTimeout(() => {
                     updateStatus(`Earned $${totalMoney} ($${baseMoney} base + $${fanBonus} fan bonus)`);
                 }, 2000);
                 setTimeout(() => {
-                    updateStatus(`Total fans: ${winner.fans} | Total money: $${winner.money}`);
+                    updateStatus(`Total wins: ${wins} | Total fans: ${winner.fans} | Total money: $${winner.money}`);
                 }, 4000);
                 
                 document.getElementById("roll-dice").disabled = true;
@@ -374,79 +380,36 @@
         }
 
         function restartGame() {
-            // Preserve current money, wins, fans, and items
-            const p1Money = gameState.player1.money;
-            const p2Money = gameState.player2.money;
-            const p1Fans = gameState.player1.fans;
-            const p2Fans = gameState.player2.fans;
-            const gamesWon = gameState.gamesWon;
+            // Clear message queue
+            messageQueue = [];
+            isDisplayingMessage = false;
             
-            // Reset game state but keep money, fans, and wins
+            // Reset game state
             gameState = {
                 phase: "setup",
                 currentPlayer: 1,
-                player1: { 
-                    hp: 100, 
-                    attack: 5, 
-                    items: [], 
-                    money: p1Money,
-                    fans: p1Fans 
-                },
-                player2: { 
-                    hp: 100, 
-                    attack: 5, 
-                    items: [], 
-                    money: p2Money,
-                    fans: p2Fans
-                },
+                player1: { hp: 100, attack: 5, items: [] },
+                player2: { hp: 100, attack: 5, items: [] },
                 player1Confirmed: false,
                 player2Confirmed: false,
                 lastRoll: null,
-                winner: null,
-                gamesWon: gamesWon
+                winner: null
             };
             
-            // Reset UI elements and show setup menu
+            // Reset UI elements
             document.getElementById("setup").style.display = "block";
             document.getElementById("controls").style.display = "none";
             document.getElementById("roll-dice").disabled = false;
-            
-            // Re-enable all selectors and buttons
-            ["p1-item1", "p1-item2", "p2-item1", "p2-item2"].forEach(id => {
-                const select = document.getElementById(id);
-                select.disabled = false;
-                select.innerHTML = ""; // Clear existing options
-                
-                // Determine which player this selector is for
-                const playerNum = id.startsWith('p1') ? 1 : 2;
-                const player = playerNum === 1 ? gameState.player1 : gameState.player2;
-                
-                // Add "No item" option
-                const noItemOption = document.createElement("option");
-                noItemOption.value = "none";
-                noItemOption.textContent = "No item (Free)";
-                noItemOption.selected = true;
-                select.appendChild(noItemOption);
-                
-                // Add all other items with updated availability based on money
-                items.forEach(item => {
-                    const option = document.createElement("option");
-                    option.value = item.name;
-                    option.textContent = `${item.name} (Attack: +${item.attack}, HP: +${item.hp}, Cost: $${item.cost})`;
-                    option.disabled = item.cost > player.money;
-                    select.appendChild(option);
-                });
+            selectors.forEach(id => {
+                document.getElementById(id).disabled = false;
             });
-            
-            // Re-enable confirm buttons
             document.getElementById("confirm-p1").disabled = false;
             document.getElementById("confirm-p2").disabled = false;
             
             // Clear and update status
             const statusDiv = document.getElementById("status");
             statusDiv.innerHTML = "";
-            updateStatus(`Select your items! Player 1: $${p1Money} (${p1Fans} fans)`);
-            updateStatus(`Player 2: $${p2Money} (${p2Fans} fans)`);
+            updateStatus("Player 1: Select your items.");
             
             drawScene();
         }
