@@ -166,7 +166,16 @@
                 checkSetupComplete();
             } catch (error) {
                 console.error("Error confirming Player 1 items:", error);
-                alert("An error occurred. Please try again.");
+                if (error.message === "Not enough money for selected items") {
+                    // Calculate the cost
+                    const noItem = { name: "none", attack: 0, hp: 0, cost: 0 };
+                    const selectedItem1 = item1 === "none" ? noItem : items.find(i => i.name === item1);
+                    const selectedItem2 = item2 === "none" ? noItem : items.find(i => i.name === item2);
+                    const totalCost = selectedItem1.cost + selectedItem2.cost;
+                    alert(`Player 1: Not enough money! You have $${gameState.player1.money} but need $${totalCost}.`);
+                } else {
+                    alert("An error occurred. Please try again.");
+                }
             }
         }
 
@@ -187,7 +196,16 @@
                 checkSetupComplete();
             } catch (error) {
                 console.error("Error confirming Player 2 items:", error);
-                alert("An error occurred. Please try again.");
+                if (error.message === "Not enough money for selected items") {
+                    // Calculate the cost
+                    const noItem = { name: "none", attack: 0, hp: 0, cost: 0 };
+                    const selectedItem1 = item1 === "none" ? noItem : items.find(i => i.name === item1);
+                    const selectedItem2 = item2 === "none" ? noItem : items.find(i => i.name === item2);
+                    const totalCost = selectedItem1.cost + selectedItem2.cost;
+                    alert(`Player 2: Not enough money! You have $${gameState.player2.money} but need $${totalCost}.`);
+                } else {
+                    alert("An error occurred. Please try again.");
+                }
             }
         }
 
@@ -380,20 +398,40 @@
         }
 
         function restartGame() {
+            // Preserve current money, wins, fans
+            const p1Money = gameState.player1.money;
+            const p2Money = gameState.player2.money;
+            const p1Fans = gameState.player1.fans;
+            const p2Fans = gameState.player2.fans;
+            const gamesWon = gameState.gamesWon;
+            
             // Clear message queue
             messageQueue = [];
             isDisplayingMessage = false;
             
-            // Reset game state
+            // Reset game state but keep money, fans, and wins
             gameState = {
                 phase: "setup",
                 currentPlayer: 1,
-                player1: { hp: 100, attack: 5, items: [] },
-                player2: { hp: 100, attack: 5, items: [] },
+                player1: { 
+                    hp: 100, 
+                    attack: 5, 
+                    items: [], 
+                    money: p1Money,
+                    fans: p1Fans 
+                },
+                player2: { 
+                    hp: 100, 
+                    attack: 5, 
+                    items: [], 
+                    money: p2Money,
+                    fans: p2Fans
+                },
                 player1Confirmed: false,
                 player2Confirmed: false,
                 lastRoll: null,
-                winner: null
+                winner: null,
+                gamesWon: gamesWon
             };
             
             // Reset UI elements
@@ -410,6 +448,32 @@
             const statusDiv = document.getElementById("status");
             statusDiv.innerHTML = "";
             updateStatus("Player 1: Select your items.");
+d            
+            // Repopulate item selectors
+            selectors.forEach(id => {
+                const select = document.getElementById(id);
+                select.innerHTML = ""; // Clear existing options
+                const playerNum = id.startsWith('p1') ? 1 : 2;
+                const player = playerNum === 1 ? gameState.player1 : gameState.player2;
+                
+                // Add "No item" option
+                const noItemOption = document.createElement("option");
+                noItemOption.value = "none";
+                noItemOption.textContent = "No item (Free)";
+                noItemOption.selected = true;
+                select.appendChild(noItemOption);
+                
+                // Add all other items with updated money restrictions
+                items.forEach(item => {
+                    const option = document.createElement("option");
+                    option.value = item.name;
+                    option.textContent = `${item.name} (Attack: +${item.attack}, HP: +${item.hp}, Cost: $${item.cost})`;
+                    option.disabled = item.cost > player.money;
+                    select.appendChild(option);
+                });
+                
+                select.disabled = false;
+            });
             
             drawScene();
         }
